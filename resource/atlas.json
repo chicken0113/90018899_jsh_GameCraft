@@ -1,0 +1,125 @@
+{
+  "room": {
+    "file": "image/room.png",
+    "size": [
+      1536,
+      1024
+    ]
+  },
+  "player": {
+    "file": "image/player.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "note": "투명 여백 포함, 위에서 본 한 자세"
+  },
+  "enemies_light": {
+    "file": "image/enemies_light.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "sprites": {
+      "red": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "cyan": [
+        0,
+        768,
+        1024,
+        768
+      ]
+    }
+  },
+  "enemies_heavy": {
+    "file": "image/enemies_heavy.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "sprites": {
+      "amber": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "violet": [
+        0,
+        768,
+        1024,
+        768
+      ]
+    }
+  },
+  "effects": {
+    "file": "image/effects.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "sprites": {
+      "muzzle_flash": [
+        0,
+        0,
+        768,
+        512
+      ],
+      "ricochet": [
+        768,
+        0,
+        768,
+        512
+      ],
+      "hit": [
+        0,
+        512,
+        768,
+        512
+      ],
+      "smoke": [
+        768,
+        512,
+        768,
+        512
+      ]
+    }
+  },
+  "props": {
+    "file": "image/props.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "sprites": {
+      "sofa": [
+        0,
+        0,
+        768,
+        512
+      ],
+      "crate": [
+        768,
+        0,
+        768,
+        512
+      ],
+      "table": [
+        0,
+        512,
+        768,
+        512
+      ],
+      "plant": [
+        768,
+        512,
+        768,
+        512
+      ]
+    }
+  }
+}
