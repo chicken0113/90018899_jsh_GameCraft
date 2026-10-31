@@ -74,7 +74,7 @@ class GameMain : G2AppBase
         if (CanWalk(_playerX, nextY)) _playerY = nextY;
 
         _walking = _playerX != oldX || _playerY != oldY;
-        if (_walking) _walkTime += (float)DeltaTime;
+        if (_walking) _walkTime += (float)Math.Min(DeltaTime, 0.05);
         else _walkTime = 0;
     }
 
@@ -86,7 +86,7 @@ class GameMain : G2AppBase
         _stage?.Draw(
             new Rect(0, 0, ScreenSize.Width, ScreenSize.Height),
             new Rect(cameraX, cameraY, ScreenSize.Width, ScreenSize.Height));
-        int frame = _walking ? (int)(_walkTime / 0.09f) % 4 : 0;
+        int frame = _walking ? (int)(_walkTime / 0.12f) % 4 : 0;
         G2Texture? sprite = frame switch
         {
             1 => _playerWalk1,
