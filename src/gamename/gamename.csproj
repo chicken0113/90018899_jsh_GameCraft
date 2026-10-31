@@ -22,7 +22,16 @@
     <Content Include="..\..\resource\image\player.png" Link="resource\image\player.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\image\player_walk_1.png" Link="resource\image\player_walk_1.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\image\player_walk_2.png" Link="resource\image\player_walk_2.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\enemies_light.png" Link="resource\image\enemies_light.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\enemies_heavy.png" Link="resource\image\enemies_heavy.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\bullet_player.png" Link="resource\image\bullet_player.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\bullet_enemy.png" Link="resource\image\bullet_enemy.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\effects.png" Link="resource\image\effects.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\sound\bgm.mp3" Link="resource\sound\bgm.mp3" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\sound\shot.wav" Link="resource\sound\shot.wav" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\sound\enemy_hit.wav" Link="resource\sound\enemy_hit.wav" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\sound\player_hit.wav" Link="resource\sound\player_hit.wav" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\sound\clear.wav" Link="resource\sound\clear.wav" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
