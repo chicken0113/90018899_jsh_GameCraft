@@ -17,4 +17,10 @@
     <PackageReference Include="Vortice.XInput" Version="3.8.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\resource\image\stage01.png" Link="resource\image\stage01.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\player.png" Link="resource\image\player.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\sound\bgm.mp3" Link="resource\sound\bgm.mp3" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
