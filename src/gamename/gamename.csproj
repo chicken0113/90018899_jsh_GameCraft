@@ -20,6 +20,8 @@
   <ItemGroup>
     <Content Include="..\..\resource\image\stage01.png" Link="resource\image\stage01.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\image\player.png" Link="resource\image\player.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\player_walk_1.png" Link="resource\image\player_walk_1.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\player_walk_2.png" Link="resource\image\player_walk_2.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\sound\bgm.mp3" Link="resource\sound\bgm.mp3" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
