@@ -6,6 +6,8 @@ class GameMain : G2AppBase
     private const float StageWidth = 1536;
     private const float StageHeight = 1280;
     private const float MoveSpeed = 240;
+    private const float PlayerBulletSpeed = 1800;
+    private const float EnemyBulletSpeed = 1500;
 
     private enum GameState { Playing, Dead, Cleared }
 
@@ -170,9 +172,9 @@ class GameMain : G2AppBase
         if (firing && _fireTimer <= 0 && aim.LengthSquared() > 100)
         {
             Vector2 direction = Vector2.Normalize(aim);
-            _bullets.Add(new Bullet(playerPosition + direction * 44, direction * 800, true));
+            _bullets.Add(new Bullet(playerPosition + direction * 44, direction * PlayerBulletSpeed, true));
             _shotSound?.Play();
-            _fireTimer = 0.22f;
+            _fireTimer = 0.18f;
         }
 
         UpdateEnemies(dt);
@@ -206,8 +208,8 @@ class GameMain : G2AppBase
             }
             if (distance < 430 && enemy.ShootTimer <= 0)
             {
-                _bullets.Add(new Bullet(enemy.Position + direction * 36, direction * 420, false));
-                enemy.ShootTimer = 1.4f + enemy.Kind * 0.15f;
+                _bullets.Add(new Bullet(enemy.Position + direction * 36, direction * EnemyBulletSpeed, false));
+                enemy.ShootTimer = 1.1f + enemy.Kind * 0.1f;
             }
         }
     }
