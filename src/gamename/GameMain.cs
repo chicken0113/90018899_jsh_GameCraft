@@ -15,6 +15,7 @@ class GameMain : G2AppBase
     private float _playerX = 320;
     private float _playerY = 320;
     private float _facingAngle;
+    private float _targetAngle;
     private float _walkTime;
     private bool _walking;
 
@@ -39,6 +40,7 @@ class GameMain : G2AppBase
             _playerX = 320;
             _playerY = 320;
             _facingAngle = 0;
+            _targetAngle = 0;
             _walkTime = 0;
             _walking = false;
             return;
@@ -53,12 +55,14 @@ class GameMain : G2AppBase
 
         if (dx == 0 && dy == 0)
         {
+            TurnTowardsTarget();
             _walking = false;
             _walkTime = 0;
             return;
         }
 
-        _facingAngle = MathF.Atan2(dy, dx);
+        _targetAngle = MathF.Atan2(dy, dx);
+        TurnTowardsTarget();
         if (dx != 0 && dy != 0)
         {
             dx *= 0.7071068f;
@@ -76,6 +80,15 @@ class GameMain : G2AppBase
         _walking = _playerX != oldX || _playerY != oldY;
         if (_walking) _walkTime += (float)Math.Min(DeltaTime, 0.05);
         else _walkTime = 0;
+    }
+
+    private void TurnTowardsTarget()
+    {
+        float difference = MathF.Atan2(
+            MathF.Sin(_targetAngle - _facingAngle),
+            MathF.Cos(_targetAngle - _facingAngle));
+        float maxTurn = 14 * (float)Math.Min(DeltaTime, 0.05);
+        _facingAngle += Math.Clamp(difference, -maxTurn, maxTurn);
     }
 
     protected override void Render()
