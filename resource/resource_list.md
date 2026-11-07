@@ -17,9 +17,19 @@
 - `preview.png`: 화면 분위기 예시이며 게임 배경에는 사용하지 않는다.
 - `multiroom_preview.png`: 타일로 세 방과 연결 통로를 배치한 예시다.
 
-현재 실행에는 방 배경, 플레이어와 적 이미지, 총알과 피격 효과, 배경음악, 발사·피격·클리어 효과음을 사용한다. 소품과 추가 타일은 이후 스테이지를 확장할 때 쓸 리소스다. `stage01.png`는 타일 배치 예시를 게임용으로 복사한 이미지이며, 현재 이동 범위는 이 배경의 방과 통로에 맞춰 잡았다.
+## 현재 게임에 쓰는 파일
 
-`atlas.json`에는 캐릭터와 소품 스프라이트의 잘라 쓸 위치 `[x, y, 너비, 높이]`를 적었다. 타일 이미지는 각각 독립된 파일이다. 플레이어는 걷기 동작이 있고, 적 캐릭터는 아직 한 자세씩만 준비했다.
+| 구분 | 파일 | 용도 |
+| --- | --- | --- |
+| 배경 | `image/stage01.png` | 세 방과 통로 |
+| 캐릭터 | `image/player.png`, `image/player_walk_1.png`, `image/player_walk_2.png` | 대기·걷기 동작 |
+| 적 | `image/enemies_light.png`, `image/enemies_heavy.png` | 적 네 종류의 외형 |
+| 전투 | `image/bullet_player.png`, `image/bullet_enemy.png`, `image/effects.png` | 총알과 충돌·피격 효과 |
+| 소리 | `sound/bgm.mp3`, `sound/shot.wav`, `sound/enemy_hit.wav`, `sound/player_hit.wav`, `sound/clear.wav` | 배경음악과 전투·클리어 효과음. 현재는 음소거 상태 |
+
+현재 게임에서 사용하지 않는 `image/room.png`, `image/props.png`, `image/tiles/`, `preview.png`, `multiroom_preview.png`는 초기 시안과 스테이지 확장용으로 보관한다. `sound/`의 나머지 WAV 파일도 추가 연출에 사용할 수 있도록 남겨 두었다. `stage01.png`는 타일 배치 예시를 게임용으로 복사한 이미지이며, 이동 범위는 이 배경의 방과 통로에 맞춰 잡았다.
+
+`atlas.json`에는 스프라이트의 위치와 이미지 크기를 적었다. 타일 이미지는 각각 독립된 파일이다. 플레이어는 걷기 동작이 있고, 적 캐릭터는 아직 한 자세씩만 준비했다.
 
 ## 소리 출처
 

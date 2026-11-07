@@ -1,4 +1,11 @@
 {
+  "stage01": {
+    "file": "image/stage01.png",
+    "size": [
+      1536,
+      1280
+    ]
+  },
   "room": {
     "file": "image/room.png",
     "size": [
@@ -13,6 +20,34 @@
       1254
     ],
     "note": "투명 여백 포함, 위에서 본 한 자세"
+  },
+  "player_walk_1": {
+    "file": "image/player_walk_1.png",
+    "size": [
+      1254,
+      1254
+    ]
+  },
+  "player_walk_2": {
+    "file": "image/player_walk_2.png",
+    "size": [
+      1254,
+      1254
+    ]
+  },
+  "bullet_player": {
+    "file": "image/bullet_player.png",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "bullet_enemy": {
+    "file": "image/bullet_enemy.png",
+    "size": [
+      32,
+      32
+    ]
   },
   "enemies_light": {
     "file": "image/enemies_light.png",
