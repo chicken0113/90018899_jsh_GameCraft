@@ -3,8 +3,6 @@ using Vortice.Mathematics;
 
 class GameMain : G2AppBase
 {
-    private const float StageWidth = 1536;
-    private const float StageHeight = 1280;
     private const float MoveSpeed = 240;
     private const float PlayerBulletSpeed = 1800;
     private const float EnemyBulletSpeed = 1500;
@@ -38,7 +36,7 @@ class GameMain : G2AppBase
     private readonly List<Enemy> _enemies = new();
     private readonly List<Bullet> _bullets = new();
     private readonly List<Impact> _impacts = new();
-    private G2Texture? _stage;
+    private StageMap? _stageMap;
     private G2Texture? _player;
     private G2Texture? _playerWalk1;
     private G2Texture? _playerWalk2;
@@ -70,7 +68,7 @@ class GameMain : G2AppBase
     protected override void Initialize()
     {
         ClearColor = new Color4(0.03f, 0.05f, 0.11f, 1.0f);
-        _stage = new G2Texture("resource/image/stage01.png");
+        _stageMap = new StageMap();
         _player = new G2Texture("resource/image/player.png");
         _playerWalk1 = new G2Texture("resource/image/player_walk_1.png");
         _playerWalk2 = new G2Texture("resource/image/player_walk_2.png");
@@ -96,8 +94,8 @@ class GameMain : G2AppBase
 
     private void ResetGame()
     {
-        _playerX = 320;
-        _playerY = 320;
+        _playerX = 1280;
+        _playerY = 1660;
         _facingAngle = 0;
         _targetAngle = 0;
         _walkTime = 0;
@@ -108,11 +106,14 @@ class GameMain : G2AppBase
         _bullets.Clear();
         _impacts.Clear();
         _enemies.Clear();
-        _enemies.Add(new Enemy(new Vector2(1020, 250), 0));
-        _enemies.Add(new Enemy(new Vector2(1250, 250), 1));
-        _enemies.Add(new Enemy(new Vector2(1240, 420), 2));
-        _enemies.Add(new Enemy(new Vector2(970, 1030), 3));
-        _enemies.Add(new Enemy(new Vector2(1250, 1010), 0));
+        _enemies.Add(new Enemy(new Vector2(1100, 1040), 0));
+        _enemies.Add(new Enemy(new Vector2(1510, 1190), 1));
+        _enemies.Add(new Enemy(new Vector2(560, 930), 2));
+        _enemies.Add(new Enemy(new Vector2(830, 1150), 0));
+        _enemies.Add(new Enemy(new Vector2(1900, 930), 3));
+        _enemies.Add(new Enemy(new Vector2(2130, 1130), 1));
+        _enemies.Add(new Enemy(new Vector2(1110, 390), 2));
+        _enemies.Add(new Enemy(new Vector2(1510, 580), 3));
     }
 
     protected override void Update()
@@ -266,7 +267,7 @@ class GameMain : G2AppBase
         }
     }
 
-    private static bool HasLineOfSight(Vector2 start, Vector2 end)
+    private bool HasLineOfSight(Vector2 start, Vector2 end)
     {
         int steps = Math.Max(1, (int)MathF.Ceiling(Vector2.Distance(start, end) / 16));
         for (int i = 0; i <= steps; i++)
@@ -289,8 +290,7 @@ class GameMain : G2AppBase
     {
         float cameraX = CameraX();
         float cameraY = CameraY();
-        _stage?.Draw(new Rect(0, 0, ScreenSize.Width, ScreenSize.Height),
-            new Rect(cameraX, cameraY, ScreenSize.Width, ScreenSize.Height));
+        _stageMap?.Draw(cameraX, cameraY, ScreenSize.Width, ScreenSize.Height);
 
         foreach (Enemy enemy in _enemies)
         {
@@ -352,21 +352,11 @@ class GameMain : G2AppBase
         RenderTarget.Transform = original;
     }
 
-    private float CameraX() => Math.Clamp(_playerX - ScreenSize.Width / 2f, 0, StageWidth - ScreenSize.Width);
-    private float CameraY() => Math.Clamp(_playerY - ScreenSize.Height / 2f, 0, StageHeight - ScreenSize.Height);
+    private float CameraX() => Math.Clamp(_playerX - ScreenSize.Width / 2f, 0, StageMap.Width - ScreenSize.Width);
+    private float CameraY() => Math.Clamp(_playerY - ScreenSize.Height / 2f, 0, StageMap.Height - ScreenSize.Height);
     private bool Held(Keys key) => Input.IsKeyDown(key) || Input.IsKeyPress(key);
 
-    private static bool Inside(float x, float y, float left, float top, float right, float bottom)
-        => x >= left && x <= right && y >= top && y <= bottom;
-
-    private static bool CanWalk(float x, float y)
-    {
-        return Inside(x, y, 125, 125, 510, 510)
-            || Inside(x, y, 500, 270, 900, 480)
-            || Inside(x, y, 885, 125, 1410, 510)
-            || Inside(x, y, 1030, 500, 1260, 900)
-            || Inside(x, y, 885, 885, 1410, 1155);
-    }
+    private bool CanWalk(float x, float y) => _stageMap?.CanWalk(x, y) ?? false;
 
     public override void Dispose()
     {
@@ -385,7 +375,7 @@ class GameMain : G2AppBase
         _playerWalk2?.Dispose();
         _playerWalk1?.Dispose();
         _player?.Dispose();
-        _stage?.Dispose();
+        _stageMap?.Dispose();
         base.Dispose();
     }
 }
