@@ -8,6 +8,7 @@ class GameMain : G2AppBase
     private const float MoveSpeed = 240;
     private const float PlayerBulletSpeed = 1800;
     private const float EnemyBulletSpeed = 1500;
+    private static readonly bool AudioEnabled = false;
 
     private enum GameState { Playing, Dead, Cleared }
 
@@ -78,16 +79,19 @@ class GameMain : G2AppBase
         _playerBullet = new G2Texture("resource/image/bullet_player.png");
         _enemyBullet = new G2Texture("resource/image/bullet_enemy.png");
         _effects = new G2Texture("resource/image/effects.png");
-        _music = new G2AudioMp3("resource/sound/bgm.mp3");
-        _shotSound = new G2AudioSound("resource/sound/shot.wav");
-        _enemyHitSound = new G2AudioSound("resource/sound/enemy_hit.wav");
-        _playerHitSound = new G2AudioSound("resource/sound/player_hit.wav");
-        _clearSound = new G2AudioSound("resource/sound/clear.wav");
+        if (AudioEnabled)
+        {
+            _music = new G2AudioMp3("resource/sound/bgm.mp3");
+            _shotSound = new G2AudioSound("resource/sound/shot.wav");
+            _enemyHitSound = new G2AudioSound("resource/sound/enemy_hit.wav");
+            _playerHitSound = new G2AudioSound("resource/sound/player_hit.wav");
+            _clearSound = new G2AudioSound("resource/sound/clear.wav");
+        }
         _hudFont = new G2Font("맑은 고딕", 20);
         _messageFont = new G2Font("맑은 고딕", 48,
             textAlignment: Vortice.DirectWrite.TextAlignment.Center);
         ResetGame();
-        _music.Play(true);
+        _music?.Play(true);
     }
 
     private void ResetGame()
