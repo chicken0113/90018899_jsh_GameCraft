@@ -1,113 +1,258 @@
+using System.IO.Compression;
+using System.Numerics;
+using System.Text.Json;
+using Vortice.Direct2D1;
 using Vortice.Mathematics;
 
-class StageMap : IDisposable
+sealed class StageMap : IDisposable
 {
-    public const int TileSize = 128;
-    public const int Columns = 20;
-    public const int Rows = 16;
-    public const int Width = Columns * TileSize;
-    public const int Height = Rows * TileSize;
+    private const string AssetDirectory = "resource/hot_heavy";
+    public const float Scale = 2;
 
-    private readonly string?[,] _tiles = new string?[Columns, Rows];
-    private readonly Dictionary<string, G2Texture> _textures = new();
-    private readonly (int X, int Y, bool Vertical)[] _doors =
-    [
-        (9, 11, false),
-        (9, 6, false),
-        (7, 8, true),
-        (12, 8, true)
-    ];
+    public sealed record Point(float X, float Y);
+    public sealed record EnemySpawn(float X, float Y, float Angle, string Kind, bool Stationary,
+        bool Patrol, Point[]? Route);
+
+    public sealed record Door(float X, float Y, bool Vertical, bool Locked)
+    {
+        private const float Width = 32;
+        private const float HalfThickness = 3;
+        private const float OpenAngle = MathF.PI / 2;
+        private const float HoldDuration = 1.1f;
+
+        private float _target;
+        private float _holdTime;
+        private float _previousAngle;
+        private bool _playerSwing;
+
+        public float Angle { get; private set; }
+        public Vector2 Hinge => new(X, Y);
+        public bool PlayerSwinging => _playerSwing && Angle != _previousAngle;
+
+        public void Reset()
+        {
+            Angle = _target = _holdTime = _previousAngle = 0;
+            _playerSwing = false;
+        }
+
+        public bool Blocks(Vector2 point, float radius = 0) => BlocksAt(point, radius, Angle);
+
+        private bool BlocksAt(Vector2 point, float radius, float angle)
+        {
+            Vector2 axis = Vertical ? new(-MathF.Sin(angle), MathF.Cos(angle))
+                : new(MathF.Cos(angle), MathF.Sin(angle));
+            Vector2 relative = point - Hinge;
+            float along = Math.Clamp(Vector2.Dot(relative, axis), 0, Width);
+            float reach = radius + HalfThickness;
+            return Vector2.DistanceSquared(relative, axis * along) <= reach * reach;
+        }
+
+        public void Push(Vector2 from, Vector2 to, bool player)
+        {
+            if (Locked) return;
+
+            float across = Vertical ? to.X - from.X : to.Y - from.Y;
+            if (MathF.Abs(across) < 0.001f) return;
+
+            _holdTime = HoldDuration;
+            if (_target != 0 && _target != Angle) return;
+
+            // A shove during closing reopens the door to the same side.
+            if (MathF.Abs(Angle) >= 0.1f)
+            {
+                _target = MathF.CopySign(OpenAngle, Angle);
+                return;
+            }
+
+            _target = MathF.CopySign(OpenAngle, Vertical ? -across : across);
+            _playerSwing = player;
+        }
+
+        public void Update(float dt, Vector2 player, IReadOnlyList<Vector2> enemies)
+        {
+            _previousAngle = Angle;
+            if (Locked) return;
+
+            if (Angle == _target && _holdTime > 0)
+            {
+                _holdTime = MathF.Max(0, _holdTime - dt);
+                if (_holdTime == 0)
+                {
+                    _target = 0;
+                    _playerSwing = false;
+                }
+            }
+
+            if (Angle == _target) return;
+
+            float step = (_target == 0 ? 5 : 14) * dt;
+            float remaining = _target - Angle;
+            float next = MathF.Abs(remaining) <= step ? _target : Angle + MathF.CopySign(step, remaining);
+            if (_target == 0 && (BlocksAt(player, 3, next) ||
+                enemies.Any(enemy => BlocksAt(enemy, 3, next))))
+                return;
+
+            Angle = next;
+        }
+
+        public bool HitByPlayerSwing(Vector2 position)
+        {
+            if (!PlayerSwinging) return false;
+
+            int steps = (int)MathF.Ceiling(MathF.Abs(Angle - _previousAngle) / 0.1f);
+            for (int step = 1; step <= steps; step++)
+            {
+                float angle = _previousAngle + (Angle - _previousAngle) * step / steps;
+                if (BlocksAt(position, 5, angle))
+                    return true;
+            }
+            return false;
+        }
+    }
+
+    public sealed record Exit(float X, float Y, int Target, int Dx, int Dy,
+        float OffsetX, float OffsetY, float Min, float Max)
+    {
+        public bool Crossed(Vector2 from, Vector2 to)
+        {
+            float start = Dx != 0 ? (from.X - X) * Dx : (from.Y - Y) * Dy;
+            float end = Dx != 0 ? (to.X - X) * Dx : (to.Y - Y) * Dy;
+            if (start > 0 || end <= 0) return false;
+            Vector2 crossing = Vector2.Lerp(from, to, -start / (end - start));
+            float along = Dx != 0 ? crossing.Y - Y : crossing.X - X;
+            return along >= Min && along <= Max;
+        }
+    }
+
+    public sealed record Area(int Width, int Height, string Texture, string Walk, string Shot,
+        Door[] Doors, Exit[] Exits, EnemySpawn[] Enemies);
+
+    private sealed record Sprite(int X, int Y, int Width, int Height, int OriginX, int OriginY);
+    private sealed record StageData(Point Start, Area[] Rooms, Dictionary<string, Sprite> Sprites);
+
+    private readonly StageData _data;
+    private readonly G2Texture _atlas;
+    private readonly G2Texture[] _backgrounds;
+    private readonly byte[][] _walk;
+    private readonly byte[][] _shot;
+
+    public Point Start => _data.Start;
+    public Area[] Areas => _data.Rooms;
 
     public StageMap()
     {
-        AddRoom(7, 11, 12, 14, "hall", "amber");
-        AddRoom(7, 6, 12, 11, "club", "magenta");
-        AddRoom(7, 1, 12, 6, "service", "cyan");
-        AddRoom(2, 6, 7, 10, "lounge", "magenta");
-        AddRoom(12, 6, 17, 10, "hall", "cyan");
-
-        foreach (var door in _doors)
+        string json = File.ReadAllText(Path.Combine(AssetDirectory, "stage.json"));
+        _data = JsonSerializer.Deserialize<StageData>(json, new JsonSerializerOptions
         {
-            _tiles[door.X, door.Y] = "floor_hall_1";
-            if (door.Vertical) _tiles[door.X, door.Y + 1] = "floor_hall_2";
-            else _tiles[door.X + 1, door.Y] = "floor_hall_2";
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        }) ?? throw new InvalidDataException("Hot & Heavy stage data is missing.");
+
+        _walk = Areas.Select(area => Decode(area.Walk, area.Width * area.Height)).ToArray();
+        _shot = Areas.Select(area => Decode(area.Shot, area.Width * area.Height)).ToArray();
+        _atlas = new G2Texture(Path.Combine(AssetDirectory, "sprites.png"));
+        List<G2Texture> backgrounds = new();
+        try
+        {
+            foreach (Area area in Areas)
+                backgrounds.Add(new G2Texture(Path.Combine(AssetDirectory, area.Texture)));
+            _backgrounds = backgrounds.ToArray();
         }
-
-        AddCover(10, 8);
-        AddCover(9, 4);
-        AddCover(5, 8);
-        AddCover(15, 9);
-
-        foreach (string? name in _tiles)
+        catch
         {
-            if (name != null && !_textures.ContainsKey(name))
-                _textures.Add(name, new G2Texture($"resource/image/tiles/{name}.png"));
-        }
-        _textures.Add("door_open_horizontal", new G2Texture("resource/image/tiles/door_open_horizontal.png"));
-        _textures.Add("door_open_vertical", new G2Texture("resource/image/tiles/door_open_vertical.png"));
-    }
-
-    private void AddRoom(int left, int top, int right, int bottom, string floor, string wall)
-    {
-        for (int y = top; y <= bottom; y++)
-        {
-            for (int x = left; x <= right; x++)
-            {
-                if (x == left || x == right)
-                    _tiles[x, y] = $"wall_{wall}_vertical";
-                else if (y == top || y == bottom)
-                    _tiles[x, y] = $"wall_{wall}_horizontal";
-                else
-                    _tiles[x, y] = $"floor_{floor}_{(x + y) % 2 + 1}";
-            }
+            foreach (G2Texture texture in backgrounds) texture.Dispose();
+            _atlas.Dispose();
+            throw;
         }
     }
 
-    private void AddCover(int x, int y)
+    private static byte[] Decode(string packed, int length)
     {
-        _tiles[x, y] = "wall_amber_horizontal";
+        using MemoryStream bytes = new(Convert.FromBase64String(packed));
+        using ZLibStream stream = new(bytes, CompressionMode.Decompress);
+        byte[] mask = new byte[length];
+        stream.ReadExactly(mask);
+        return mask;
     }
 
-    public bool CanWalk(float x, float y)
+    public void Reset()
     {
-        if (x < 0 || y < 0 || x >= Width || y >= Height) return false;
-        string? tile = _tiles[(int)x / TileSize, (int)y / TileSize];
-        return tile != null && tile.StartsWith("floor_", StringComparison.Ordinal);
+        foreach (Area area in Areas)
+            foreach (Door door in area.Doors)
+                door.Reset();
     }
 
-    public void Draw(float cameraX, float cameraY, int screenWidth, int screenHeight)
+    public bool CanWalk(int area, Vector2 position) => Inside(area, position, _walk);
+
+    public bool TryStep(int area, Vector2 from, Vector2 to, bool player)
     {
-        int left = Math.Max(0, (int)cameraX / TileSize);
-        int top = Math.Max(0, (int)cameraY / TileSize);
-        int right = Math.Min(Columns - 1, (int)(cameraX + screenWidth) / TileSize);
-        int bottom = Math.Min(Rows - 1, (int)(cameraY + screenHeight) / TileSize);
+        if (!CanWalk(area, to)) return false;
 
-        for (int y = top; y <= bottom; y++)
+        foreach (Door door in Areas[area].Doors)
         {
-            for (int x = left; x <= right; x++)
-            {
-                string? name = _tiles[x, y];
-                if (name == null) continue;
-                _textures[name].Draw(
-                    new Rect(x * TileSize - cameraX, y * TileSize - cameraY, TileSize, TileSize),
-                    new Rect(0, 0, TileSize, TileSize));
-            }
+            if (!door.Blocks(to, 2)) continue;
+            door.Push(from, to, player);
+            return false;
         }
 
-        foreach (var door in _doors)
+        return true;
+    }
+
+    public bool CanShoot(int area, Vector2 position)
+    {
+        if (!Inside(area, position, _shot)) return false;
+        foreach (Door door in Areas[area].Doors)
+            if (door.Blocks(position))
+                return false;
+        return true;
+    }
+
+    private bool Inside(int index, Vector2 point, byte[][] masks)
+    {
+        Area area = Areas[index];
+        return point.X >= 0 && point.X < area.Width && point.Y >= 0 && point.Y < area.Height &&
+            masks[index][(int)point.Y * area.Width + (int)point.X] != 0;
+    }
+
+    public void Draw(int index, Vector2 camera, bool roomCleared)
+    {
+        Area area = Areas[index];
+        _backgrounds[index].Draw(
+            new Rect(-camera.X * Scale, -camera.Y * Scale, area.Width * Scale, area.Height * Scale),
+            new Rect(0, 0, area.Width, area.Height), 1, BitmapInterpolationMode.NearestNeighbor);
+
+        foreach (Door door in area.Doors)
         {
-            float x = door.X * TileSize - cameraX;
-            float y = door.Y * TileSize - cameraY;
-            if (x < -256 || y < -256 || x > screenWidth || y > screenHeight) continue;
-            string name = door.Vertical ? "door_open_vertical" : "door_open_horizontal";
-            _textures[name].Draw(
-                new Rect(x, y, door.Vertical ? 128 : 256, door.Vertical ? 256 : 128),
-                new Rect(0, 0, door.Vertical ? 128 : 256, door.Vertical ? 256 : 128));
+            if (door.Locked) continue;
+            string sprite = door.Vertical ? "sprDoorV" : "sprDoorH";
+            DrawSprite(sprite, 0, door.Hinge, camera, door.Angle);
         }
+
+        if (!roomCleared) return;
+        foreach (Exit exit in area.Exits)
+        {
+            int frame = exit.Dx > 0 ? 0 : exit.Dx < 0 ? 2 : exit.Dy > 0 ? 3 : 1;
+            DrawSprite("sprGoArrow", frame, new Vector2(exit.X, exit.Y), camera, 0);
+        }
+    }
+
+    public void DrawSprite(string name, int frame, Vector2 position, Vector2 camera, float angle)
+    {
+        if (!_data.Sprites.TryGetValue($"{name}_{frame}", out Sprite? sprite))
+            sprite = _data.Sprites[$"{name}_0"];
+
+        Vector2 center = (position - camera) * Scale;
+        var target = G2AppBase.Instance!.RenderTarget;
+        Matrix3x2 previous = target.Transform;
+        target.Transform = Matrix3x2.CreateRotation(angle, center) * previous;
+        _atlas.Draw(new Rect(center.X - sprite.OriginX * Scale, center.Y - sprite.OriginY * Scale,
+            sprite.Width * Scale, sprite.Height * Scale),
+            new Rect(sprite.X, sprite.Y, sprite.Width, sprite.Height), 1, BitmapInterpolationMode.NearestNeighbor);
+        target.Transform = previous;
     }
 
     public void Dispose()
     {
-        foreach (G2Texture texture in _textures.Values) texture.Dispose();
+        foreach (G2Texture texture in _backgrounds) texture.Dispose();
+        _atlas.Dispose();
     }
 }
