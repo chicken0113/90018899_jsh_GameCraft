@@ -19,6 +19,12 @@
 
   <ItemGroup>
     <Content Include="..\..\resource\hot_heavy\*" Link="resource\hot_heavy\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\tiles\floor_service_1.png" Link="resource\image\tiles\floor_service_1.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\tiles\floor_club_1.png" Link="resource\image\tiles\floor_club_1.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\tiles\wall_cyan_horizontal.png" Link="resource\image\tiles\wall_cyan_horizontal.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\tiles\wall_cyan_vertical.png" Link="resource\image\tiles\wall_cyan_vertical.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\tiles\wall_amber_horizontal.png" Link="resource\image\tiles\wall_amber_horizontal.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\resource\image\tiles\wall_amber_vertical.png" Link="resource\image\tiles\wall_amber_vertical.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\sound\bgm.mp3" Link="resource\sound\bgm.mp3" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\sound\shot.wav" Link="resource\sound\shot.wav" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\resource\sound\enemy_hit.wav" Link="resource\sound\enemy_hit.wav" CopyToOutputDirectory="PreserveNewest" />

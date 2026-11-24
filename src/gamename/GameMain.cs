@@ -6,13 +6,16 @@ class GameMain : G2AppBase
     private const float MoveSpeed = 135;
     private const float PlayerBulletSpeed = 900;
     private const float EnemyBulletSpeed = 750;
-    private const float EnemyDetectionRange = 210;
+    private const float EnemyDetectionRange = 155;
+    private const float GunWindup = 0.9f;
+    private const float MeleeWindup = 0.55f;
     private static readonly bool AudioEnabled = true;
     private static readonly string[] AreaNames = ["1층", "2층 북서", "2층 동쪽", "2층 남동"];
+    private static readonly string[] StageNames = ["첫 돌입", "측면 공격", "마지막 밤"];
     private static readonly string[] Guns = ["sprEWalkM16", "sprEWalkShotgun", "sprEWalkDoubleBarrel"];
     private static readonly string[] MeleeWeapons = ["sprEWalkClub", "sprEWalkBat", "sprEWalkPipe", "sprEWalkKnife"];
 
-    private enum GameState { Playing, Dead, Cleared }
+    private enum GameState { Playing, Dead, StageComplete, GameComplete }
 
     private sealed class Enemy(StageMap.EnemySpawn spawn, string sprite, int index)
     {
@@ -24,7 +27,8 @@ class GameMain : G2AppBase
         public int PatrolStep = 1;
         public readonly List<Vector2> ChaseTrail = new();
         public float StunTime;
-        public float ShootTimer = 0.75f + (index % 4) * 0.15f;
+        public float AttackTimer = 1.25f + (index % 4) * 0.2f;
+        public float Windup;
         public float WalkTime;
         public bool Alive = true;
     }
@@ -60,6 +64,7 @@ class GameMain : G2AppBase
     private float _fireTimer;
     private float _transitionTimer;
     private int _area;
+    private int _stageIndex;
     private bool _hasFired;
     private GameState _state;
 
@@ -73,7 +78,6 @@ class GameMain : G2AppBase
     protected override void Initialize()
     {
         ClearColor = new Color4(0.03f, 0.05f, 0.11f, 1);
-        _stageMap = new StageMap();
         if (AudioEnabled && G2AudioContext.Instance?.Audio != null)
         {
             G2AudioContext.Instance.MasteringVoice?.SetVolume(0.35f);
@@ -87,11 +91,20 @@ class GameMain : G2AppBase
         _hudFont = new G2Font("맑은 고딕", 20);
         _messageFont = new G2Font("맑은 고딕", 48,
             textAlignment: Vortice.DirectWrite.TextAlignment.Center);
-        ResetGame();
+        StartStage(0);
         _music?.Play(true);
     }
 
-    private void ResetGame()
+    private void StartStage(int index)
+    {
+        StageMap next = new(index);
+        _stageMap?.Dispose();
+        _stageMap = next;
+        _stageIndex = index;
+        ResetStage();
+    }
+
+    private void ResetStage()
     {
         _area = 0;
         _player = new Vector2(_stageMap.Start.X, _stageMap.Start.Y);
@@ -121,7 +134,14 @@ class GameMain : G2AppBase
     {
         if (Input.IsKeyDown(Keys.R))
         {
-            ResetGame();
+            if (_state == GameState.GameComplete) StartStage(0);
+            else ResetStage();
+            return;
+        }
+
+        if (_state == GameState.StageComplete && Input.IsKeyDown(Keys.Enter))
+        {
+            StartStage(_stageIndex + 1);
             return;
         }
 
@@ -150,7 +170,7 @@ class GameMain : G2AppBase
 
         if (_area == 0 && AllCleared && _player.Y >= 626 && MathF.Abs(_player.X - _stageMap.Start.X) < 48)
         {
-            _state = GameState.Cleared;
+            _state = _stageIndex == StageMap.StageCount - 1 ? GameState.GameComplete : GameState.StageComplete;
             _clearSound?.Play();
             return;
         }
@@ -294,7 +314,7 @@ class GameMain : G2AppBase
                 enemy.WalkTime = 0;
                 continue;
             }
-            enemy.ShootTimer -= dt;
+            enemy.AttackTimer = MathF.Max(0, enemy.AttackTimer - dt);
             Vector2 toPlayer = _player - enemy.Position;
             float distance = toPlayer.Length();
             bool seesPlayer = distance > 0 && distance < EnemyDetectionRange && HasLineOfSight(enemy.Position, _player);
@@ -305,28 +325,42 @@ class GameMain : G2AppBase
             {
                 Vector2 direction = toPlayer / distance;
                 enemy.Angle = MathF.Atan2(direction.Y, direction.X);
-                if (closeRange && distance <= 12)
+                bool inAttackRange = !closeRange || distance <= 17;
+                if (inAttackRange && enemy.Windup > 0)
                 {
-                    KillPlayer();
-                    return;
+                    enemy.Windup -= dt;
+                    if (enemy.Windup <= 0)
+                    {
+                        enemy.Windup = 0;
+                        enemy.AttackTimer = closeRange ? 1.2f : enemy.Sprite == Guns[0] ? 1.5f : 1.9f;
+                        if (closeRange)
+                        {
+                            KillPlayer();
+                            return;
+                        }
+                        _bullets.Add(new Bullet(enemy.Position, direction * EnemyBulletSpeed, false));
+                    }
+                }
+                else if (inAttackRange && enemy.AttackTimer <= 0)
+                {
+                    enemy.Windup = closeRange ? MeleeWindup : GunWindup;
+                }
+                else if (closeRange && !inAttackRange)
+                {
+                    enemy.Windup = 0;
                 }
 
-                if (closeRange || (!enemy.Spawn.Stationary && distance > 90))
+                if (enemy.Windup <= 0 && (closeRange || (!enemy.Spawn.Stationary && distance > 90)))
                 {
                     float speed = enemy.Spawn.Kind == "dog" ? 175 : closeRange ? 105 : 60;
                     enemy.Position = Move(enemy.Position, direction * speed * dt,
                         trail: enemy.Spawn.Patrol ? enemy.ChaseTrail : null);
                 }
-
-                if (!closeRange && enemy.ShootTimer <= 0)
-                {
-                    _bullets.Add(new Bullet(enemy.Position, direction * EnemyBulletSpeed, false));
-                    enemy.ShootTimer = enemy.Sprite == Guns[0] ? 0.75f : 1.15f;
-                }
             }
-            else if (enemy.Spawn.Patrol)
+            else
             {
-                Patrol(enemy, dt);
+                enemy.Windup = 0;
+                if (enemy.Spawn.Patrol) Patrol(enemy, dt);
             }
 
             enemy.WalkTime = enemy.Position == previous ? 0 : enemy.WalkTime + dt;
@@ -399,8 +433,16 @@ class GameMain : G2AppBase
         foreach (Enemy enemy in CurrentEnemies)
         {
             if (enemy.Alive)
+            {
                 _stageMap.DrawSprite(enemy.Sprite, WalkFrame(enemy.WalkTime), enemy.Position, camera,
                     enemy.Angle + (enemy.StunTime > 0 ? MathF.PI / 2 : 0));
+                if (enemy.Windup > 0)
+                {
+                    Vector2 screen = (enemy.Position - camera) * StageMap.Scale;
+                    _hudFont?.DrawText("!", new Rect(screen.X - 10, screen.Y - 45, 25, 30),
+                        new Color4(1, 0.22f, 0.2f, 1));
+                }
+            }
         }
 
         foreach (Bullet bullet in _bullets)
@@ -422,17 +464,32 @@ class GameMain : G2AppBase
                 WalkFrame(_walkTime), _player, camera, _facingAngle);
 
         int remaining = CurrentEnemies.Count(enemy => enemy.Alive);
-        string status = AllCleared ? "차로 돌아가세요" :
+        string status = AllCleared ?
+            (_stageIndex == StageMap.StageCount - 1 ? "입구 차로 돌아가세요" : "남쪽 출구로 이동하세요") :
             remaining == 0 ? "계단으로 이동하세요" : $"남은 적 {remaining}";
-        _hudFont?.DrawText($"{AreaNames[_area]}  |  {status}     WASD 이동 · 마우스 발사 · R 재시작",
+        string areaName = _stageIndex == StageMap.StageCount - 1 ? AreaNames[_area] :
+            _stageIndex == 0 ? "창고" : "클럽";
+        _hudFont?.DrawText($"{_stageIndex + 1}/{StageMap.StageCount} {StageNames[_stageIndex]} · {areaName}  |  {status}",
             new Rect(20, 12, 900, 40), new Color4(1, 1, 1, 1));
+        _hudFont?.DrawText("WASD 이동 · 마우스 발사 · R 재시작",
+            new Rect(20, 44, 900, 35), new Color4(0.78f, 0.88f, 0.95f, 1));
 
         if (_state == GameState.Dead)
             _messageFont?.DrawText("사망  |  R로 재시작",
                 new Rect(0, 270, ScreenSize.Width, 100), new Color4(1, 0.35f, 0.43f, 1));
-        else if (_state == GameState.Cleared)
-            _messageFont?.DrawText("클리어!  |  R로 다시 시작",
-                new Rect(0, 270, ScreenSize.Width, 100), new Color4(0.35f, 1, 0.82f, 1));
+        else if (_state == GameState.StageComplete)
+            _messageFont?.DrawText("스테이지 클리어!",
+                new Rect(0, 240, ScreenSize.Width, 100), new Color4(0.35f, 1, 0.82f, 1));
+        else if (_state == GameState.GameComplete)
+            _messageFont?.DrawText("모든 스테이지 클리어!",
+                new Rect(0, 240, ScreenSize.Width, 100), new Color4(0.35f, 1, 0.82f, 1));
+
+        if (_state == GameState.StageComplete)
+            _hudFont?.DrawText("Enter 다음 스테이지 · R 현재 스테이지 다시 시작",
+                new Rect(180, 340, 700, 40), new Color4(1, 1, 1, 1));
+        else if (_state == GameState.GameComplete)
+            _hudFont?.DrawText("R 처음부터 다시 시작",
+                new Rect(350, 340, 400, 40), new Color4(1, 1, 1, 1));
     }
 
     private Vector2 Camera()
