@@ -12,7 +12,6 @@ class GameMain : G2AppBase
     private const float MeleeWindup = 0.55f;
     private static readonly bool AudioEnabled = true;
     private static readonly string[] AreaNames = ["1층", "2층 북서", "2층 동쪽", "2층 남동"];
-    private static readonly string[] StageNames = ["The Metro", "No Talk", "Hot & Heavy"];
     private static readonly string[] Guns = ["sprEWalkM16", "sprEWalkShotgun", "sprEWalkDoubleBarrel"];
     private static readonly string[] MeleeWeapons = ["sprEWalkClub", "sprEWalkBat", "sprEWalkPipe", "sprEWalkKnife"];
 
@@ -161,14 +160,22 @@ class GameMain : G2AppBase
             return;
         }
 
-        if (Input.IsKeyDown(Keys.R))
+        if (_state == GameState.GameComplete)
         {
-            if (_state == GameState.GameComplete)
+            System.Drawing.PointF mouse = Input.MousePosition;
+            bool returnClicked = Input.IsButtonDown(MouseButtons.Left) &&
+                mouse.X >= 340 && mouse.X <= 620 && mouse.Y >= 400 && mouse.Y <= 470;
+            if (Input.IsKeyDown(Keys.Enter) || Input.IsKeyDown(Keys.R) || returnClicked)
             {
                 StartStage(0);
                 _state = GameState.Title;
             }
-            else ResetStage();
+            return;
+        }
+
+        if (Input.IsKeyDown(Keys.R))
+        {
+            ResetStage();
             return;
         }
 
@@ -473,6 +480,11 @@ class GameMain : G2AppBase
             RenderTitle();
             return;
         }
+        if (_state == GameState.GameComplete)
+        {
+            RenderGameComplete();
+            return;
+        }
 
         Vector2 camera = Camera();
         _stageMap.Draw(_area, camera, AreaCleared);
@@ -519,7 +531,7 @@ class GameMain : G2AppBase
         string areaName = _stageIndex == StageMap.StageCount - 1 ? AreaNames[_area] :
             _stageIndex == 0 ? (_area == 0 ? "역 입구" : "역 내부") :
             (_area == 0 ? "아파트 입구" : "아파트 2층");
-        _hudFont?.DrawText($"{_stageIndex + 1}/{StageMap.StageCount} {StageNames[_stageIndex]} · {areaName}  |  {status}",
+        _hudFont?.DrawText($"{areaName}  |  {status}",
             new Rect(20, 12, 900, 40), new Color4(1, 1, 1, 1));
         _hudFont?.DrawText("WASD 이동 · 마우스 발사 · R 재시작",
             new Rect(20, 44, 900, 35), new Color4(0.78f, 0.88f, 0.95f, 1));
@@ -537,16 +549,10 @@ class GameMain : G2AppBase
         else if (_state == GameState.StageComplete)
             _messageFont?.DrawText("다음 스테이지",
                 new Rect(0, 240, ScreenSize.Width, 100), new Color4(0.35f, 1, 0.82f, 1));
-        else if (_state == GameState.GameComplete)
-            _messageFont?.DrawText("모든 스테이지 클리어!",
-                new Rect(0, 240, ScreenSize.Width, 100), new Color4(0.35f, 1, 0.82f, 1));
 
         if (_state == GameState.StageComplete)
             _hudFont?.DrawText("Enter 다음 스테이지 · R 현재 스테이지 다시 시작",
                 new Rect(180, 340, 700, 40), new Color4(1, 1, 1, 1));
-        else if (_state == GameState.GameComplete)
-            _hudFont?.DrawText("R 처음부터 다시 시작",
-                new Rect(350, 340, 400, 40), new Color4(1, 1, 1, 1));
     }
 
     private void RenderTitle()
@@ -555,7 +561,7 @@ class GameMain : G2AppBase
         _stageMap.Draw(_area, camera, false);
         RenderTarget.FillRectangle(new Rect(0, 0, ScreenSize.Width, ScreenSize.Height), _titlePanel!);
         _titleFont?.DrawText("Shooter Lounge", new Rect(80, 145, 800, 110), new Color4(1, 0.32f, 0.56f, 1));
-        _hudFont?.DrawText("원샷원킬 탑다운 액션  ·  3개 스테이지",
+        _hudFont?.DrawText("원샷원킬 탑다운 액션",
             new Rect(260, 265, 600, 45), new Color4(0.73f, 0.89f, 0.95f, 1));
         RenderTarget.FillRectangle(new Rect(360, 365, 240, 65), _startButton!);
         _buttonFont?.DrawText("게임 시작", new Rect(360, 376, 240, 50), new Color4(1, 1, 1, 1));
@@ -563,6 +569,23 @@ class GameMain : G2AppBase
             new Rect(360, 445, 300, 35), new Color4(0.86f, 0.91f, 0.95f, 1));
         _hudFont?.DrawText("WASD 이동  ·  마우스 조준·발사  ·  R 스테이지 재시작",
             new Rect(245, 540, 600, 35), new Color4(0.74f, 0.8f, 0.9f, 1));
+    }
+
+    private void RenderGameComplete()
+    {
+        RenderTarget.FillRectangle(new Rect(0, 0, ScreenSize.Width, ScreenSize.Height), _titlePanel!);
+        RenderTarget.FillRectangle(new Rect(140, 155, 680, 4), _startButton!);
+        _hudFont?.DrawText("Shooter Lounge", new Rect(390, 95, 300, 40),
+            new Color4(1, 0.32f, 0.56f, 1));
+        _titleFont?.DrawText("GAME CLEAR", new Rect(80, 185, 800, 115),
+            new Color4(0.35f, 1, 0.82f, 1));
+        _buttonFont?.DrawText("모든 스테이지 클리어!", new Rect(230, 312, 600, 55),
+            new Color4(1, 1, 1, 1));
+        RenderTarget.FillRectangle(new Rect(340, 400, 280, 70), _startButton!);
+        _buttonFont?.DrawText("타이틀로 돌아가기", new Rect(340, 414, 280, 52),
+            new Color4(1, 1, 1, 1));
+        _hudFont?.DrawText("Enter 또는 R · 버튼 클릭", new Rect(340, 500, 360, 40),
+            new Color4(0.82f, 0.9f, 0.94f, 1));
     }
 
     private Vector2 Camera()
