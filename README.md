@@ -1,6 +1,6 @@
 # 기말과제
 - 성명: 전승효
-- 게임이름: 미정
+- 게임이름: Shooter Lounge
 
 ## 실행
 - Visual Studio에서 `src/gamename/gamename.slnx`를 열고 실행한다.

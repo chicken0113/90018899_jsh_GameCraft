@@ -554,7 +554,7 @@ class GameMain : G2AppBase
         Vector2 camera = Camera();
         _stageMap.Draw(_area, camera, false);
         RenderTarget.FillRectangle(new Rect(0, 0, ScreenSize.Width, ScreenSize.Height), _titlePanel!);
-        _titleFont?.DrawText("미정", new Rect(80, 145, 800, 110), new Color4(1, 0.32f, 0.56f, 1));
+        _titleFont?.DrawText("Shooter Lounge", new Rect(80, 145, 800, 110), new Color4(1, 0.32f, 0.56f, 1));
         _hudFont?.DrawText("원샷원킬 탑다운 액션  ·  3개 스테이지",
             new Rect(260, 265, 600, 45), new Color4(0.73f, 0.89f, 0.95f, 1));
         RenderTarget.FillRectangle(new Rect(360, 365, 240, 65), _startButton!);
