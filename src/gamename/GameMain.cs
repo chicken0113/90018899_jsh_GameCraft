@@ -1,4 +1,5 @@
 using System.Numerics;
+using Vortice.Direct2D1;
 using Vortice.Mathematics;
 
 class GameMain : G2AppBase
@@ -11,11 +12,11 @@ class GameMain : G2AppBase
     private const float MeleeWindup = 0.55f;
     private static readonly bool AudioEnabled = true;
     private static readonly string[] AreaNames = ["1층", "2층 북서", "2층 동쪽", "2층 남동"];
-    private static readonly string[] StageNames = ["첫 돌입", "측면 공격", "마지막 밤"];
+    private static readonly string[] StageNames = ["The Metro", "No Talk", "Hot & Heavy"];
     private static readonly string[] Guns = ["sprEWalkM16", "sprEWalkShotgun", "sprEWalkDoubleBarrel"];
     private static readonly string[] MeleeWeapons = ["sprEWalkClub", "sprEWalkBat", "sprEWalkPipe", "sprEWalkKnife"];
 
-    private enum GameState { Playing, Dead, StageComplete, GameComplete }
+    private enum GameState { Title, Playing, Dead, StageComplete, GameComplete }
 
     private sealed class Enemy(StageMap.EnemySpawn spawn, string sprite, int index)
     {
@@ -58,6 +59,10 @@ class GameMain : G2AppBase
     private G2AudioSound? _clearSound;
     private G2Font? _hudFont;
     private G2Font? _messageFont;
+    private G2Font? _titleFont;
+    private G2Font? _buttonFont;
+    private ID2D1SolidColorBrush? _titlePanel;
+    private ID2D1SolidColorBrush? _startButton;
     private Vector2 _player;
     private float _facingAngle;
     private float _walkTime;
@@ -66,6 +71,8 @@ class GameMain : G2AppBase
     private int _area;
     private int _stageIndex;
     private bool _hasFired;
+    private bool _clearAnnounced;
+    private float _clearNoticeTime;
     private GameState _state;
 
     private Enemy[] CurrentEnemies => _enemies[_area];
@@ -91,7 +98,14 @@ class GameMain : G2AppBase
         _hudFont = new G2Font("맑은 고딕", 20);
         _messageFont = new G2Font("맑은 고딕", 48,
             textAlignment: Vortice.DirectWrite.TextAlignment.Center);
+        _titleFont = new G2Font("맑은 고딕", 68,
+            textAlignment: Vortice.DirectWrite.TextAlignment.Center);
+        _buttonFont = new G2Font("맑은 고딕", 28,
+            textAlignment: Vortice.DirectWrite.TextAlignment.Center);
+        _titlePanel = RenderTarget.CreateSolidColorBrush(new Color4(0.015f, 0.025f, 0.07f, 0.9f));
+        _startButton = RenderTarget.CreateSolidColorBrush(new Color4(0.08f, 0.35f, 0.44f, 0.96f));
         StartStage(0);
+        _state = GameState.Title;
         _music?.Play(true);
     }
 
@@ -112,6 +126,8 @@ class GameMain : G2AppBase
         _walkTime = _fireTimer = _transitionTimer = 0;
         _state = GameState.Playing;
         _hasFired = false;
+        _clearAnnounced = false;
+        _clearNoticeTime = 0;
         _bullets.Clear();
         _impacts.Clear();
         _stageMap.Reset();
@@ -132,9 +148,23 @@ class GameMain : G2AppBase
 
     protected override void Update()
     {
+        if (_state == GameState.Title)
+        {
+            System.Drawing.PointF mouse = Input.MousePosition;
+            bool startClicked = Input.IsButtonDown(MouseButtons.Left) &&
+                mouse.X >= 360 && mouse.X <= 600 && mouse.Y >= 365 && mouse.Y <= 430;
+            if (Input.IsKeyDown(Keys.Enter) || Input.IsKeyDown(Keys.Space) || startClicked)
+                ResetStage();
+            return;
+        }
+
         if (Input.IsKeyDown(Keys.R))
         {
-            if (_state == GameState.GameComplete) StartStage(0);
+            if (_state == GameState.GameComplete)
+            {
+                StartStage(0);
+                _state = GameState.Title;
+            }
             else ResetStage();
             return;
         }
@@ -146,6 +176,7 @@ class GameMain : G2AppBase
         }
 
         float dt = (float)Math.Min(DeltaTime, 0.05);
+        _clearNoticeTime = MathF.Max(0, _clearNoticeTime - dt);
         for (int i = _impacts.Count - 1; i >= 0; i--)
         {
             _impacts[i].Time -= dt;
@@ -168,10 +199,10 @@ class GameMain : G2AppBase
         if (_transitionTimer <= 0 && AreaCleared && TryChangeArea(previousPosition))
             return;
 
-        if (_area == 0 && AllCleared && _player.Y >= 626 && MathF.Abs(_player.X - _stageMap.Start.X) < 48)
+        if (_area == 0 && AllCleared && Vector2.Distance(_player,
+            new Vector2(_stageMap.Finish.X, _stageMap.Finish.Y)) < 40)
         {
             _state = _stageIndex == StageMap.StageCount - 1 ? GameState.GameComplete : GameState.StageComplete;
-            _clearSound?.Play();
             return;
         }
 
@@ -402,6 +433,12 @@ class GameMain : G2AppBase
                         enemy.Alive = false;
                         _impacts.Add(new Impact(enemy.Position, false));
                         _enemyHitSound?.Play();
+                        if (!_clearAnnounced && AllCleared)
+                        {
+                            _clearAnnounced = true;
+                            _clearNoticeTime = 2.2f;
+                            _clearSound?.Play();
+                        }
                         remove = true;
                         break;
                     }
@@ -428,8 +465,17 @@ class GameMain : G2AppBase
 
     protected override void Render()
     {
+        if (_state == GameState.Title)
+        {
+            RenderTitle();
+            return;
+        }
+
         Vector2 camera = Camera();
         _stageMap.Draw(_area, camera, AreaCleared);
+        if (AllCleared && _area == 0)
+            _stageMap.DrawSprite("sprGoArrow", _stageIndex == 1 ? 1 : 3,
+                new Vector2(_stageMap.Finish.X, _stageMap.Finish.Y + (_stageIndex == 1 ? 32 : 0)), camera, 0);
         foreach (Enemy enemy in CurrentEnemies)
         {
             if (enemy.Alive)
@@ -465,20 +511,28 @@ class GameMain : G2AppBase
 
         int remaining = CurrentEnemies.Count(enemy => enemy.Alive);
         string status = AllCleared ?
-            (_stageIndex == StageMap.StageCount - 1 ? "입구 차로 돌아가세요" : "남쪽 출구로 이동하세요") :
+            (_stageIndex == StageMap.StageCount - 1 ? "입구 차로 돌아가세요" : "처음 입구로 돌아가세요") :
             remaining == 0 ? "계단으로 이동하세요" : $"남은 적 {remaining}";
         string areaName = _stageIndex == StageMap.StageCount - 1 ? AreaNames[_area] :
-            _stageIndex == 0 ? "창고" : "클럽";
+            _stageIndex == 0 ? (_area == 0 ? "역 입구" : "역 내부") :
+            (_area == 0 ? "아파트 입구" : "아파트 2층");
         _hudFont?.DrawText($"{_stageIndex + 1}/{StageMap.StageCount} {StageNames[_stageIndex]} · {areaName}  |  {status}",
             new Rect(20, 12, 900, 40), new Color4(1, 1, 1, 1));
         _hudFont?.DrawText("WASD 이동 · 마우스 발사 · R 재시작",
             new Rect(20, 44, 900, 35), new Color4(0.78f, 0.88f, 0.95f, 1));
 
+        if (_clearNoticeTime > 0 && _state == GameState.Playing)
+        {
+            RenderTarget.FillRectangle(new Rect(260, 255, 440, 90), _titlePanel!);
+            _messageFont?.DrawText("클리어!",
+                new Rect(0, 250, ScreenSize.Width, 100), new Color4(0.35f, 1, 0.82f, 1));
+        }
+
         if (_state == GameState.Dead)
             _messageFont?.DrawText("사망  |  R로 재시작",
                 new Rect(0, 270, ScreenSize.Width, 100), new Color4(1, 0.35f, 0.43f, 1));
         else if (_state == GameState.StageComplete)
-            _messageFont?.DrawText("스테이지 클리어!",
+            _messageFont?.DrawText("다음 스테이지",
                 new Rect(0, 240, ScreenSize.Width, 100), new Color4(0.35f, 1, 0.82f, 1));
         else if (_state == GameState.GameComplete)
             _messageFont?.DrawText("모든 스테이지 클리어!",
@@ -490,6 +544,22 @@ class GameMain : G2AppBase
         else if (_state == GameState.GameComplete)
             _hudFont?.DrawText("R 처음부터 다시 시작",
                 new Rect(350, 340, 400, 40), new Color4(1, 1, 1, 1));
+    }
+
+    private void RenderTitle()
+    {
+        Vector2 camera = Camera();
+        _stageMap.Draw(_area, camera, false);
+        RenderTarget.FillRectangle(new Rect(0, 0, ScreenSize.Width, ScreenSize.Height), _titlePanel!);
+        _titleFont?.DrawText("미정", new Rect(80, 145, 800, 110), new Color4(1, 0.32f, 0.56f, 1));
+        _hudFont?.DrawText("원샷원킬 탑다운 액션  ·  3개 스테이지",
+            new Rect(260, 265, 600, 45), new Color4(0.73f, 0.89f, 0.95f, 1));
+        RenderTarget.FillRectangle(new Rect(360, 365, 240, 65), _startButton!);
+        _buttonFont?.DrawText("게임 시작", new Rect(360, 376, 240, 50), new Color4(1, 1, 1, 1));
+        _hudFont?.DrawText("Enter 또는 버튼 클릭",
+            new Rect(360, 445, 300, 35), new Color4(0.86f, 0.91f, 0.95f, 1));
+        _hudFont?.DrawText("WASD 이동  ·  마우스 조준·발사  ·  R 재시작",
+            new Rect(245, 540, 600, 35), new Color4(0.74f, 0.8f, 0.9f, 1));
     }
 
     private Vector2 Camera()
@@ -506,6 +576,10 @@ class GameMain : G2AppBase
 
     public override void Dispose()
     {
+        _startButton?.Dispose();
+        _titlePanel?.Dispose();
+        _buttonFont?.Dispose();
+        _titleFont?.Dispose();
         _messageFont?.Dispose();
         _hudFont?.Dispose();
         _clearSound?.Dispose();

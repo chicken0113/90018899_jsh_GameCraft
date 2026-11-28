@@ -10,17 +10,6 @@ sealed class StageMap : IDisposable
     public const float Scale = 2;
     public const int StageCount = 3;
 
-    private sealed record TileBlock(int X, int Y, bool Vertical);
-
-    private static readonly TileBlock[][] TileLayouts =
-    [
-        [new(128, 128, false), new(512, 128, false), new(384, 384, false),
-         new(384, 128, true), new(128, 384, true), new(640, 512, true)],
-        [new(256, 128, false), new(512, 256, false), new(128, 384, false),
-         new(384, 512, false), new(128, 128, true), new(512, 128, true),
-         new(384, 384, true)]
-    ];
-
     public sealed record Point(float X, float Y);
     public sealed record EnemySpawn(float X, float Y, float Angle, string Kind, bool Stationary,
         bool Patrol, Point[]? Route);
@@ -140,107 +129,51 @@ sealed class StageMap : IDisposable
         Door[] Doors, Exit[] Exits, EnemySpawn[] Enemies);
 
     private sealed record Sprite(int X, int Y, int Width, int Height, int OriginX, int OriginY);
-    private sealed record StageData(Point Start, Area[] Rooms, Dictionary<string, Sprite> Sprites);
+    private sealed record StageData(Point Start, Point? Finish, Area[] Rooms,
+        Dictionary<string, Sprite> Sprites);
 
     private readonly StageData _data;
     private readonly G2Texture _atlas;
-    private readonly G2Texture?[] _backgrounds;
-    private readonly G2Texture? _floor;
-    private readonly G2Texture? _horizontalWall;
-    private readonly G2Texture? _verticalWall;
-    private readonly int _tileLayoutIndex;
+    private readonly G2Texture[] _backgrounds;
     private readonly byte[][] _walk;
     private readonly byte[][] _shot;
 
     public Point Start => _data.Start;
+    public Point Finish => _data.Finish ?? new Point(176, 650);
     public Area[] Areas => _data.Rooms;
 
     public StageMap(int stageIndex)
     {
         if (stageIndex < 0 || stageIndex >= StageCount)
             throw new ArgumentOutOfRangeException(nameof(stageIndex));
-        _tileLayoutIndex = stageIndex;
-
-        string json = File.ReadAllText(Path.Combine(AssetDirectory, "stage.json"));
-        StageData source = JsonSerializer.Deserialize<StageData>(json, new JsonSerializerOptions
+        string file = stageIndex switch
+        {
+            0 => "metro.json",
+            1 => "no_talk.json",
+            _ => "stage.json"
+        };
+        string json = File.ReadAllText(Path.Combine(AssetDirectory, file));
+        _data = JsonSerializer.Deserialize<StageData>(json, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        }) ?? throw new InvalidDataException("Hot & Heavy stage data is missing.");
-
-        _data = stageIndex == StageCount - 1 ? source : BuildTileStage(stageIndex, source.Sprites);
+        }) ?? throw new InvalidDataException($"Stage data is missing: {file}");
 
         _walk = Areas.Select(area => Decode(area.Walk, area.Width * area.Height)).ToArray();
         _shot = Areas.Select(area => Decode(area.Shot, area.Width * area.Height)).ToArray();
         _atlas = new G2Texture(Path.Combine(AssetDirectory, "sprites.png"));
-        List<G2Texture?> backgrounds = new();
+        List<G2Texture> backgrounds = new();
         try
         {
             foreach (Area area in Areas)
-                backgrounds.Add(area.Texture == "tile" ? null :
-                    new G2Texture(Path.Combine(AssetDirectory, area.Texture)));
+                backgrounds.Add(new G2Texture(Path.Combine(AssetDirectory, area.Texture)));
             _backgrounds = backgrounds.ToArray();
-            if (stageIndex < StageCount - 1)
-            {
-                string tiles = Path.Combine("resource", "image", "tiles");
-                _floor = new G2Texture(Path.Combine(tiles,
-                    stageIndex == 0 ? "floor_service_1.png" : "floor_club_1.png"));
-                _horizontalWall = new G2Texture(Path.Combine(tiles,
-                    stageIndex == 0 ? "wall_cyan_horizontal.png" : "wall_amber_horizontal.png"));
-                _verticalWall = new G2Texture(Path.Combine(tiles,
-                    stageIndex == 0 ? "wall_cyan_vertical.png" : "wall_amber_vertical.png"));
-            }
         }
         catch
         {
-            foreach (G2Texture? texture in backgrounds) texture?.Dispose();
-            _floor?.Dispose();
-            _horizontalWall?.Dispose();
-            _verticalWall?.Dispose();
+            foreach (G2Texture texture in backgrounds) texture.Dispose();
             _atlas.Dispose();
             throw;
         }
-    }
-
-    private static StageData BuildTileStage(int index, Dictionary<string, Sprite> sprites)
-    {
-        const int width = 800;
-        const int height = 704;
-        byte[] mask = new byte[width * height];
-        for (int y = 16; y < height - 20; y++)
-            Array.Fill(mask, (byte)1, y * width + 16, width - 32);
-
-        foreach (TileBlock block in TileLayouts[index])
-        {
-            int left = block.X + (block.Vertical ? 20 : 0);
-            int top = block.Y + (block.Vertical ? 0 : 52);
-            int right = block.X + (block.Vertical ? 74 : 128);
-            int bottom = block.Y + (block.Vertical ? 128 : 120);
-            for (int y = top; y < bottom; y++)
-                Array.Fill(mask, (byte)0, y * width + left, right - left);
-        }
-
-        EnemySpawn[] enemies = index == 0
-            ? [Spawn(290, 190, "gun"), Spawn(520, 100, "gun"), Spawn(650, 220, "melee"),
-               Spawn(555, 360, "gun"), Spawn(240, 350, "melee"), Spawn(330, 530, "gun"),
-               Spawn(570, 590, "melee"), Spawn(620, 560, "gun")]
-            : [Spawn(315, 80, "gun"), Spawn(590, 90, "gun"), Spawn(685, 190, "melee"),
-               Spawn(305, 295, "melee"), Spawn(470, 300, "gun"), Spawn(680, 380, "gun"),
-               Spawn(295, 570, "gun"), Spawn(540, 580, "melee"), Spawn(700, 570, "gun"),
-               Spawn(75, 250, "melee"), Spawn(580, 585, "dog"), Spawn(345, 360, "gun")];
-
-        Area room = new(width, height, "tile", Pack(mask), Pack(mask), [], [], enemies);
-        return new StageData(new Point(176, 608), [room], sprites);
-    }
-
-    private static EnemySpawn Spawn(float x, float y, string kind) =>
-        new(x, y, 0, kind, false, false, null);
-
-    private static string Pack(byte[] mask)
-    {
-        using MemoryStream bytes = new();
-        using (ZLibStream stream = new(bytes, CompressionLevel.Fastest, true))
-            stream.Write(mask);
-        return Convert.ToBase64String(bytes.ToArray());
     }
 
     private static byte[] Decode(string packed, int length)
@@ -294,8 +227,7 @@ sealed class StageMap : IDisposable
     public void Draw(int index, Vector2 camera, bool roomCleared)
     {
         Area area = Areas[index];
-        if (area.Texture == "tile") DrawTileRoom(camera, area);
-        else _backgrounds[index]!.Draw(
+        _backgrounds[index].Draw(
             new Rect(-camera.X * Scale, -camera.Y * Scale, area.Width * Scale, area.Height * Scale),
             new Rect(0, 0, area.Width, area.Height), 1, BitmapInterpolationMode.NearestNeighbor);
 
@@ -307,30 +239,11 @@ sealed class StageMap : IDisposable
         }
 
         if (!roomCleared) return;
-        if (area.Texture == "tile")
-            DrawSprite("sprGoArrow", 3, new Vector2(Start.X, 650), camera, 0);
         foreach (Exit exit in area.Exits)
         {
             int frame = exit.Dx > 0 ? 0 : exit.Dx < 0 ? 2 : exit.Dy > 0 ? 3 : 1;
             DrawSprite("sprGoArrow", frame, new Vector2(exit.X, exit.Y), camera, 0);
         }
-    }
-
-    private void DrawTileRoom(Vector2 camera, Area area)
-    {
-        for (int y = 0; y < area.Height; y += 128)
-            for (int x = 0; x < area.Width; x += 128)
-                DrawTile(_floor!, x, y, camera);
-
-        foreach (TileBlock block in TileLayouts[_tileLayoutIndex])
-            DrawTile(block.Vertical ? _verticalWall! : _horizontalWall!, block.X, block.Y, camera);
-    }
-
-    private static void DrawTile(G2Texture texture, int x, int y, Vector2 camera)
-    {
-        texture.Draw(new Rect((x - camera.X) * Scale, (y - camera.Y) * Scale,
-            128 * Scale, 128 * Scale), new Rect(0, 0, 128, 128), 1,
-            BitmapInterpolationMode.NearestNeighbor);
     }
 
     public void DrawSprite(string name, int frame, Vector2 position, Vector2 camera, float angle)
@@ -350,10 +263,7 @@ sealed class StageMap : IDisposable
 
     public void Dispose()
     {
-        foreach (G2Texture? texture in _backgrounds) texture?.Dispose();
-        _floor?.Dispose();
-        _horizontalWall?.Dispose();
-        _verticalWall?.Dispose();
+        foreach (G2Texture texture in _backgrounds) texture.Dispose();
         _atlas.Dispose();
     }
 }
