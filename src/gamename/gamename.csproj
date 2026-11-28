@@ -3,6 +3,9 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
+    <AssemblyName>Shooter Lounge</AssemblyName>
+    <Product>Shooter Lounge</Product>
+    <AssemblyTitle>Shooter Lounge</AssemblyTitle>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWindowsForms>True</UseWindowsForms>
