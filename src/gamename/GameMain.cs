@@ -154,7 +154,10 @@ class GameMain : G2AppBase
             bool startClicked = Input.IsButtonDown(MouseButtons.Left) &&
                 mouse.X >= 360 && mouse.X <= 600 && mouse.Y >= 365 && mouse.Y <= 430;
             if (Input.IsKeyDown(Keys.Enter) || Input.IsKeyDown(Keys.Space) || startClicked)
+            {
                 ResetStage();
+                _fireTimer = 0.25f;
+            }
             return;
         }
 
@@ -558,7 +561,7 @@ class GameMain : G2AppBase
         _buttonFont?.DrawText("게임 시작", new Rect(360, 376, 240, 50), new Color4(1, 1, 1, 1));
         _hudFont?.DrawText("Enter 또는 버튼 클릭",
             new Rect(360, 445, 300, 35), new Color4(0.86f, 0.91f, 0.95f, 1));
-        _hudFont?.DrawText("WASD 이동  ·  마우스 조준·발사  ·  R 재시작",
+        _hudFont?.DrawText("WASD 이동  ·  마우스 조준·발사  ·  R 스테이지 재시작",
             new Rect(245, 540, 600, 35), new Color4(0.74f, 0.8f, 0.9f, 1));
     }
 
